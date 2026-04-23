@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-medical-50: #f0f7ff;
+  --color-medical-100: #e0effe;
+  --color-medical-600: #2563eb;
+  --color-medical-700: #1d4ed8;
+  --color-medical-800: #1e40af;
+}
+
+.modal-hidden {
+  pointer-events: none;
+}
+.modal-backdrop {
+  transition: opacity 0.2s ease;
+}
+.modal-panel {
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+.modal-hidden .modal-backdrop {
+  opacity: 0;
+  pointer-events: none;
+}
+.modal-hidden .modal-panel {
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+  pointer-events: none;
+}
+
+body {
+  margin: 0;
+}

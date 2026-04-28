@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Modal } from './Modal'
-import type { AgeGroup, Client, ClientType, Sport } from '../types'
+import type { Client, ClientType, Sport } from '../types'
 
 const LOCATIONS = [
   'Joint',
@@ -14,6 +14,12 @@ const LOCATIONS = [
 const TOTAL_STEPS = 4
 const STEP_TITLES = ['Basic info', 'Client type', 'Health assessment', 'Measurements']
 
+function ageToGroup(age: number): Client['ageGroup'] {
+  if (age < 20) return 'Teen'
+  if (age < 60) return 'Adult'
+  return 'Senior'
+}
+
 interface OnboardingModalProps {
   open: boolean
   onClose: () => void
@@ -23,15 +29,14 @@ interface OnboardingModalProps {
 const initialForm = () => ({
   name: '',
   age: '',
-  ageGroup: '' as AgeGroup | '',
   type: '' as ClientType | '',
   sport: 'Soccer' as Sport,
   painLevel: 5,
-  timeOfDay: '' as 'Morning' | 'Evening' | '',
-  swelling: '' as 'Yes' | 'No' | '',
+  timeOfDay: 'Morning' as 'Morning' | 'Evening',
+  swelling: 'No' as 'Yes' | 'No',
   locations: [] as string[],
   internalExternal: 'Internal' as 'Internal' | 'External',
-  headaches: '' as 'Yes' | 'No' | '',
+  headaches: 'No' as 'Yes' | 'No',
   steps: '',
   sleep: '',
   heartRate: '',
@@ -61,10 +66,6 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
       const age = Number(f.age)
       if (!f.age || age < 1 || age > 120) {
         setStepError('Please enter a valid age (1–120).')
-        return false
-      }
-      if (!f.ageGroup) {
-        setStepError('Please select an age classification.')
         return false
       }
     }
@@ -127,12 +128,13 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
     if (!validateStep(step)) return
     const now = new Date().toISOString()
     const pain = form.painLevel
+    const ageNumber = Number(form.age)
     const newClient: Client = {
       id: 'c' + Date.now(),
       name: form.name.trim(),
-      age: Number(form.age),
+      age: ageNumber,
       type: form.type as ClientType,
-      ageGroup: form.ageGroup as AgeGroup,
+      ageGroup: ageToGroup(ageNumber),
       sport: form.type === 'Athlete' ? form.sport : null,
       painLevel: pain,
       timeOfDay: form.timeOfDay as string,
@@ -227,25 +229,6 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
                   onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <span className="block text-xs font-medium text-slate-600 mb-2">
-                  Age classification
-                </span>
-                <div className="flex flex-wrap gap-4">
-                  {(['Teen', 'Adult', 'Senior'] as const).map((ag) => (
-                    <label key={ag} className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="ageGroup"
-                        checked={form.ageGroup === ag}
-                        onChange={() => setForm((f) => ({ ...f, ageGroup: ag }))}
-                        className="text-medical-600"
-                      />
-                      {ag === 'Teen' ? 'Teenagers' : ag === 'Adult' ? 'Adults' : 'Seniors'}
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
           </fieldset>
@@ -476,6 +459,18 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
                 className="px-5 py-2.5 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700 shadow-sm transition-colors"
               >
                 Next
+              </button>
+            )}
+            {step === 3 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStepError('')
+                  setStep(4)
+                }}
+                className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                Skip
               </button>
             )}
             {step === TOTAL_STEPS && (

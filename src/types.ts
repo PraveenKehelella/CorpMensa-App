@@ -37,6 +37,13 @@ export interface GameResult {
   completionTime: number
 }
 
+export interface VitalSignsPoint {
+  date: string
+  heartRate: number
+  systolic: number | null
+  diastolic: number | null
+}
+
 export interface Client {
   id: string
   name: string
@@ -53,10 +60,14 @@ export interface Client {
   steps: number
   sleep: number
   heartRate: number
+  bloodPressureSystolic: number | null
+  bloodPressureDiastolic: number | null
+  vitalsOverview: string
   lastUpdated: string
   notes: string
   active: boolean
   painHistory: PainHistoryPoint[]
+  vitalSignsHistory: VitalSignsPoint[]
   cognitiveMetrics: CognitiveMetrics | null
   cognitiveHistory: CognitiveSessionPoint[]
 }

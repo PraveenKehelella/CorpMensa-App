@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal } from './Modal'
 import { PainTrendChart } from './PainTrendChart'
 import { CognitiveTrendChart } from './CognitiveTrendChart'
-import type { Client } from '../types'
+import { VitalSignsChart } from './VitalSignsChart'
+import type { Client, VitalSignsPoint } from '../types'
 import { formatDate } from '../lib/clients'
+import { extractVitalsFromImage } from '../lib/api'
 
 interface ClientDetailModalProps {
   client: Client | null
@@ -36,6 +38,13 @@ export function ClientDetailModal({
   const [edSleep, setEdSleep] = useState('')
   const [edHR, setEdHR] = useState('')
   const [chartTab, setChartTab] = useState<'pain' | 'cognitive'>('pain')
+  const [extractingVitals, setExtractingVitals] = useState(false)
+  const [vitalsError, setVitalsError] = useState('')
+  const [vitalsMessage, setVitalsMessage] = useState('')
+  const [confirmVitalsOpen, setConfirmVitalsOpen] = useState(false)
+  const [pendingVitalsPoints, setPendingVitalsPoints] = useState<VitalSignsPoint[]>([])
+  const [pendingVitalsOverview, setPendingVitalsOverview] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!client) return
@@ -45,6 +54,12 @@ export function ClientDetailModal({
     setEdHR(String(client.heartRate))
     setEditOpen(!!startInEditMode)
     setChartTab('pain')
+    setExtractingVitals(false)
+    setVitalsError('')
+    setVitalsMessage('')
+    setConfirmVitalsOpen(false)
+    setPendingVitalsPoints([])
+    setPendingVitalsOverview('')
   }, [client, startInEditMode, open])
 
   if (!client) return null
@@ -69,6 +84,15 @@ export function ClientDetailModal({
       sleep: sl,
       heartRate: hr,
       lastUpdated: new Date().toISOString(),
+      vitalSignsHistory: [
+        ...(c.vitalSignsHistory || []),
+        {
+          date: new Date().toISOString(),
+          heartRate: hr,
+          systolic: c.bloodPressureSystolic,
+          diastolic: c.bloodPressureDiastolic,
+        },
+      ],
     }
     if (p !== c.painLevel) {
       const history = [...(c.painHistory || [])]
@@ -84,6 +108,104 @@ export function ClientDetailModal({
       notes,
       lastUpdated: new Date().toISOString(),
     })
+  }
+
+  function readAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(new Error('Failed to read image file'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleVitalsUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setVitalsError('')
+    setVitalsMessage('')
+    setExtractingVitals(true)
+
+    try {
+      const dataUrl = await readAsDataUrl(file)
+      const imageBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+      const extracted = await extractVitalsFromImage(imageBase64, {
+        id: c.id,
+        name: c.name,
+        age: c.age,
+        type: c.type,
+        sport: c.sport,
+        ageGroup: c.ageGroup,
+        painLevel: c.painLevel,
+        sleep: c.sleep,
+        heartRate: c.heartRate,
+        bloodPressureSystolic: c.bloodPressureSystolic,
+        bloodPressureDiastolic: c.bloodPressureDiastolic,
+        notes: c.notes,
+        recentVitals: (c.vitalSignsHistory || []).slice(-5),
+      })
+      const validPoints: VitalSignsPoint[] = (extracted.points || [])
+        .map((point, index) => {
+          const hasHeartRate =
+            typeof point.heartRate === 'number' && point.heartRate >= 30 && point.heartRate <= 220
+          const hasBloodPressure =
+            typeof point.systolic === 'number' && typeof point.diastolic === 'number'
+          if (!hasHeartRate && !hasBloodPressure) return null
+
+          return {
+            date: point.capturedAt || new Date(Date.now() + index * 1000).toISOString(),
+            heartRate: hasHeartRate ? Number(point.heartRate) : c.heartRate,
+            systolic: hasBloodPressure ? Number(point.systolic) : c.bloodPressureSystolic,
+            diastolic: hasBloodPressure ? Number(point.diastolic) : c.bloodPressureDiastolic,
+          }
+        })
+        .filter((point): point is VitalSignsPoint => point !== null)
+
+      if (validPoints.length === 0) {
+        setVitalsError('No valid vital signs were detected in this image.')
+        return
+      }
+
+      const sortedPoints = [...validPoints].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      )
+      setPendingVitalsPoints(sortedPoints)
+      setPendingVitalsOverview((extracted.overview || '').trim())
+      setConfirmVitalsOpen(true)
+      setVitalsMessage(`Extracted ${sortedPoints.length} data points. Please confirm.`)
+    } catch (err) {
+      setVitalsError(err instanceof Error ? err.message : 'Unable to extract vital signs.')
+    } finally {
+      setExtractingVitals(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function handleConfirmVitals() {
+    if (!pendingVitalsPoints.length) return
+    const latestPoint = pendingVitalsPoints[pendingVitalsPoints.length - 1] as VitalSignsPoint
+    const patch: Partial<Client> = {
+      heartRate: latestPoint.heartRate,
+      bloodPressureSystolic: latestPoint.systolic,
+      bloodPressureDiastolic: latestPoint.diastolic,
+      vitalsOverview: pendingVitalsOverview || c.vitalsOverview || '',
+      lastUpdated: new Date().toISOString(),
+      vitalSignsHistory: [...(c.vitalSignsHistory || []), ...pendingVitalsPoints],
+    }
+    setEdHR(String(latestPoint.heartRate))
+    onSaveClient(c.id, patch)
+    setConfirmVitalsOpen(false)
+    setPendingVitalsPoints([])
+    setPendingVitalsOverview('')
+    setVitalsMessage(`Saved ${pendingVitalsPoints.length} vital sign data points.`)
+  }
+
+  function handleCancelVitalsConfirm() {
+    setConfirmVitalsOpen(false)
+    setPendingVitalsPoints([])
+    setPendingVitalsOverview('')
+    setVitalsMessage('Extraction canceled. No data was saved.')
   }
 
   return (
@@ -180,7 +302,7 @@ export function ClientDetailModal({
 
         <div>
           <h3 className="text-sm font-semibold text-slate-800 mb-2">Measurements</h3>
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center">
               <p className="text-xs text-slate-500">Steps</p>
               <p className="text-lg font-semibold text-slate-900">{c.steps}</p>
@@ -193,6 +315,63 @@ export function ClientDetailModal({
               <p className="text-xs text-slate-500">Heart rate</p>
               <p className="text-lg font-semibold text-slate-900">{c.heartRate}</p>
             </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center">
+              <p className="text-xs text-slate-500">Blood pressure</p>
+              <p className="text-lg font-semibold text-slate-900">
+                {c.bloodPressureSystolic && c.bloodPressureDiastolic
+                  ? `${c.bloodPressureSystolic}/${c.bloodPressureDiastolic}`
+                  : '—'}
+              </p>
+            </div>
+          </div>
+          {(c.vitalSignsHistory?.length || 0) > 1 ? (
+            <div className="mt-4 rounded-xl border border-slate-200 p-3 bg-white">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                Vital signs trend
+              </p>
+              <VitalSignsChart history={c.vitalSignsHistory} />
+              <div className="mt-3">
+                <label
+                  htmlFor="vitalsOverview"
+                  className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1"
+                >
+                  Medical overview
+                </label>
+                <textarea
+                  id="vitalsOverview"
+                  readOnly
+                  value={
+                    c.vitalsOverview ||
+                    'Upload a vital signs screenshot to generate a brief personalized interpretation.'
+                  }
+                  className="w-full min-h-[68px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 resize-none"
+                />
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleVitalsUpload}
+              className="hidden"
+              id="vitalsUploadInput"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={extractingVitals}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {extractingVitals ? 'Extracting vitals...' : 'Upload Vital Signs'}
+            </button>
+            {vitalsMessage ? (
+              <p className="mt-2 text-xs text-emerald-700">{vitalsMessage}</p>
+            ) : null}
+            {vitalsError ? (
+              <p className="mt-2 text-xs text-red-600">{vitalsError}</p>
+            ) : null}
           </div>
         </div>
 
@@ -287,6 +466,72 @@ export function ClientDetailModal({
 
         <p className="text-xs text-slate-400">Last updated: {formatDate(c.lastUpdated)}</p>
       </div>
+      <Modal
+        open={confirmVitalsOpen}
+        title="Confirm extracted vital signs"
+        onClose={handleCancelVitalsConfirm}
+        size="md"
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-600">
+            Review the extracted values before saving to this client profile.
+          </p>
+          <div className="max-h-64 overflow-auto rounded-lg border border-slate-200">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Date/Time</th>
+                  <th className="px-3 py-2 font-semibold">Blood pressure</th>
+                  <th className="px-3 py-2 font-semibold">Heart rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingVitalsPoints.map((point) => (
+                  <tr key={`${point.date}-${point.heartRate}-${point.systolic ?? 'n'}-${point.diastolic ?? 'n'}`} className="border-b border-slate-100 last:border-0">
+                    <td className="px-3 py-2 text-slate-700">
+                      {new Date(point.date).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {point.systolic && point.diastolic ? `${point.systolic}/${point.diastolic}` : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">{point.heartRate}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <label
+              htmlFor="pendingOverview"
+              className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1"
+            >
+              Generated medical overview
+            </label>
+            <textarea
+              id="pendingOverview"
+              value={pendingVitalsOverview || 'No overview generated.'}
+              onChange={(e) => setPendingVitalsOverview(e.target.value)}
+              className="w-full min-h-[72px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 resize-y"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleCancelVitalsConfirm}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmVitals}
+              className="px-4 py-2 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700"
+            >
+              Confirm and save
+            </button>
+          </div>
+        </div>
+      </Modal>
     </Modal>
   )
 }

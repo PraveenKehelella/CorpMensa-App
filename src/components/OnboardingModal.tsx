@@ -143,10 +143,21 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
       steps: Number(form.steps),
       sleep: Number(form.sleep),
       heartRate: Number(form.heartRate),
+      bloodPressureSystolic: null,
+      bloodPressureDiastolic: null,
+      vitalsOverview: '',
       lastUpdated: now,
       notes: '',
       active: true,
       painHistory: [{ date: now, value: pain }],
+      vitalSignsHistory: [
+        {
+          date: now,
+          heartRate: Number(form.heartRate),
+          systolic: null,
+          diastolic: null,
+        },
+      ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
     }

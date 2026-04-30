@@ -11,7 +11,7 @@ import {
   painBadgeClass,
   sportsInUse,
 } from './lib/clients'
-import { createClient, fetchClients, updateClient } from './lib/api'
+import { createClient, deleteClient, fetchClients, updateClient } from './lib/api'
 
 export default function App() {
   const [clients, setClients] = useState<Client[]>(() => createInitialClients())
@@ -156,6 +156,17 @@ export default function App() {
       } catch {
         // Keep optimistic local state.
       }
+    }
+  }
+
+  async function handleDeleteClient(id: string) {
+    const previous = clients
+    setClients((prev) => prev.filter((c) => c.id !== id))
+    closeDetail()
+    try {
+      await deleteClient(id)
+    } catch {
+      setClients(previous)
     }
   }
 
@@ -396,6 +407,7 @@ export default function App() {
         startInEditMode={detailStartEdit}
         onClose={closeDetail}
         onSaveClient={handleSaveClient}
+        onDeleteClient={handleDeleteClient}
       />
       <CognitiveGamesModal
         open={cognitiveOpen}

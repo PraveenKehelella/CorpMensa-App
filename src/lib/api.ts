@@ -41,6 +41,13 @@ export async function updateClient(id: string, patch: Partial<Client>): Promise<
   return res.json()
 }
 
+export async function deleteClient(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/clients/${id}/`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error('Failed to delete client')
+}
+
 export async function extractVitalsFromImage(
   imageBase64: string,
   clientContext: Record<string, unknown>,

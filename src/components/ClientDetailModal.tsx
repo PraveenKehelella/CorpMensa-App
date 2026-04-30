@@ -14,6 +14,7 @@ interface ClientDetailModalProps {
   /** If true, show edit form expanded on open */
   startInEditMode?: boolean
   onSaveClient: (id: string, patch: Partial<Client>) => void
+  onDeleteClient: (id: string) => void
 }
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
@@ -31,6 +32,7 @@ export function ClientDetailModal({
   onClose,
   startInEditMode,
   onSaveClient,
+  onDeleteClient,
 }: ClientDetailModalProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [notes, setNotes] = useState('')
@@ -44,6 +46,8 @@ export function ClientDetailModal({
   const [confirmVitalsOpen, setConfirmVitalsOpen] = useState(false)
   const [pendingVitalsPoints, setPendingVitalsPoints] = useState<VitalSignsPoint[]>([])
   const [pendingVitalsOverview, setPendingVitalsOverview] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleteText, setDeleteText] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -60,6 +64,8 @@ export function ClientDetailModal({
     setConfirmVitalsOpen(false)
     setPendingVitalsPoints([])
     setPendingVitalsOverview('')
+    setConfirmDeleteOpen(false)
+    setDeleteText('')
   }, [client, startInEditMode, open])
 
   if (!client) return null
@@ -208,6 +214,17 @@ export function ClientDetailModal({
     setVitalsMessage('Extraction canceled. No data was saved.')
   }
 
+  function handleRequestDelete() {
+    setDeleteText('')
+    setConfirmDeleteOpen(true)
+  }
+
+  function handleConfirmDelete() {
+    if (deleteText.trim().toLowerCase() !== 'delete') return
+    setConfirmDeleteOpen(false)
+    onDeleteClient(c.id)
+  }
+
   return (
     <Modal open={open} title={c.name} onClose={onClose} size="lg">
       <div className="p-6 space-y-6">
@@ -331,21 +348,13 @@ export function ClientDetailModal({
               </p>
               <VitalSignsChart history={c.vitalSignsHistory} />
               <div className="mt-3">
-                <label
-                  htmlFor="vitalsOverview"
-                  className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1"
-                >
+                <p className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
                   Medical overview
-                </label>
-                <textarea
-                  id="vitalsOverview"
-                  readOnly
-                  value={
-                    c.vitalsOverview ||
-                    'Upload a vital signs screenshot to generate a brief personalized interpretation.'
-                  }
-                  className="w-full min-h-[68px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 resize-none"
-                />
+                </p>
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 whitespace-pre-wrap break-words">
+                  {c.vitalsOverview ||
+                    'Upload a vital signs screenshot to generate a brief personalized interpretation.'}
+                </div>
               </div>
             </div>
           ) : null}
@@ -465,6 +474,15 @@ export function ClientDetailModal({
         </div>
 
         <p className="text-xs text-slate-400">Last updated: {formatDate(c.lastUpdated)}</p>
+        <div className="pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={handleRequestDelete}
+            className="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-medium hover:bg-red-50"
+          >
+            Delete client
+          </button>
+        </div>
       </div>
       <Modal
         open={confirmVitalsOpen}
@@ -528,6 +546,42 @@ export function ClientDetailModal({
               className="px-4 py-2 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700"
             >
               Confirm and save
+            </button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        open={confirmDeleteOpen}
+        title="Delete client"
+        onClose={() => setConfirmDeleteOpen(false)}
+        size="md"
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-600">
+            Type <span className="font-semibold text-slate-900">delete</span> to permanently remove this client.
+          </p>
+          <input
+            type="text"
+            value={deleteText}
+            onChange={(e) => setDeleteText(e.target.value)}
+            placeholder="Type delete"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteOpen(false)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteText.trim().toLowerCase() !== 'delete'}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Delete
             </button>
           </div>
         </div>

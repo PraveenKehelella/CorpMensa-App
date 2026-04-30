@@ -47,6 +47,15 @@ class ClientDetailView(APIView):
         record.save(update_fields=["payload", "updated_at"])
         return Response(_to_client_payload(record))
 
+    @transaction.atomic
+    def delete(self, request, client_id: str):
+        try:
+            record = ClientRecord.objects.get(id=client_id)
+        except ClientRecord.DoesNotExist:
+            return Response({"detail": "Client not found."}, status=status.HTTP_404_NOT_FOUND)
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class VitalsExtractView(APIView):
     def post(self, request):

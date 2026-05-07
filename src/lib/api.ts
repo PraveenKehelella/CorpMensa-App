@@ -1,7 +1,9 @@
-import type { Client } from '../types'
+import type { Client, OculomotorDominanceResult, SensoryDominanceResult } from '../types'
 
-const API_BASE = 'http://127.0.0.1:8000/api'
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) || 'http://127.0.0.1:8000/api'
 const VITALS_API = `${API_BASE}/vitals/extract/`
+const ONBOARDING_VOICE_API = `${API_BASE}/onboarding/voice-tests/`
 
 export interface ExtractedVitalPoint {
   heartRate: number | null
@@ -18,7 +20,12 @@ export interface ExtractedVitals {
 export async function fetchClients(): Promise<Client[]> {
   const res = await fetch(`${API_BASE}/clients/`)
   if (!res.ok) throw new Error('Failed to fetch clients')
-  return res.json()
+  const list = (await res.json()) as Client[]
+  return list.map((c) => ({
+    ...c,
+    oculomotorDominance: c.oculomotorDominance ?? null,
+    sensoryDominance: c.sensoryDominance ?? null,
+  }))
 }
 
 export async function createClient(client: Client): Promise<Client> {
@@ -46,6 +53,30 @@ export async function deleteClient(id: string): Promise<void> {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete client')
+}
+
+export interface OnboardingVoiceTestsResponse {
+  transcript: string
+  oculomotor: OculomotorDominanceResult
+  sensory: SensoryDominanceResult
+}
+
+export async function submitOnboardingVoiceTests(audio: Blob): Promise<OnboardingVoiceTestsResponse> {
+  const form = new FormData()
+  const ext = audio.type.includes('webm') ? 'webm' : audio.type.includes('wav') ? 'wav' : 'webm'
+  form.append('audio', audio, `recording.${ext}`)
+
+  const res = await fetch(ONBOARDING_VOICE_API, {
+    method: 'POST',
+    body: form,
+  })
+
+  if (!res.ok) {
+    const message = await res.text()
+    throw new Error(message || 'Voice transcription failed')
+  }
+
+  return res.json()
 }
 
 export async function extractVitalsFromImage(

@@ -44,6 +44,19 @@ export interface VitalSignsPoint {
   diastolic: number | null
 }
 
+/** Oculomotor dominance (motor alignment) — alternate cover / pointing test */
+export interface OculomotorDominanceResult {
+  dominantEye: 'left' | 'right'
+  fixationStability: string
+}
+
+/** Sensory dominance — rivalry / blur / Worth 4 Dot */
+export interface SensoryDominanceResult {
+  dominantEye: 'left' | 'right'
+  suppression: 'present' | 'absent'
+  rivalryResponse: 'stable' | 'alternating'
+}
+
 export interface Client {
   id: string
   name: string
@@ -70,4 +83,6 @@ export interface Client {
   vitalSignsHistory: VitalSignsPoint[]
   cognitiveMetrics: CognitiveMetrics | null
   cognitiveHistory: CognitiveSessionPoint[]
+  oculomotorDominance: OculomotorDominanceResult | null
+  sensoryDominance: SensoryDominanceResult | null
 }

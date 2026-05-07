@@ -32,3 +32,36 @@
 body {
   margin: 0;
 }
+
+@keyframes voice-ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes voice-bar-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.voice-listen-ring {
+  animation: voice-ring-pulse 1.1s ease-in-out infinite;
+}
+
+.voice-listen-bar {
+  transform-origin: bottom center;
+  animation: voice-bar-bounce 0.55s ease-in-out infinite;
+}

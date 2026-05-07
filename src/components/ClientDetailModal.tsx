@@ -241,6 +241,22 @@ export function ClientDetailModal({
           <ProfileRow label="Pain locations" value={loc} />
           <ProfileRow label="Internal / External" value={c.internalExternal} />
           <ProfileRow label="Headaches" value={c.headaches} />
+          <ProfileRow
+            label="Oculomotor dominance"
+            value={
+              c.oculomotorDominance
+                ? `${c.oculomotorDominance.dominantEye} eye — ${c.oculomotorDominance.fixationStability}`
+                : '—'
+            }
+          />
+          <ProfileRow
+            label="Sensory dominance"
+            value={
+              c.sensoryDominance
+                ? `${c.sensoryDominance.dominantEye} eye, suppression ${c.sensoryDominance.suppression}, rivalry ${c.sensoryDominance.rivalryResponse}`
+                : '—'
+            }
+          />
         </div>
 
         <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50 space-y-3">

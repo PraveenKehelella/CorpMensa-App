@@ -50,6 +50,12 @@ export function createInitialClients(): Client[] {
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
+      oculomotorDominance: { dominantEye: 'right', fixationStability: 'Good' },
+      sensoryDominance: {
+        dominantEye: 'right',
+        suppression: 'absent',
+        rivalryResponse: 'stable',
+      },
     },
     {
       id: 'c2',
@@ -79,6 +85,8 @@ export function createInitialClients(): Client[] {
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
+      oculomotorDominance: null,
+      sensoryDominance: null,
     },
     {
       id: 'c3',
@@ -108,6 +116,8 @@ export function createInitialClients(): Client[] {
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
+      oculomotorDominance: null,
+      sensoryDominance: null,
     },
     {
       id: 'c4',
@@ -137,6 +147,8 @@ export function createInitialClients(): Client[] {
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
+      oculomotorDominance: null,
+      sensoryDominance: null,
     },
     {
       id: 'c5',
@@ -166,6 +178,8 @@ export function createInitialClients(): Client[] {
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
+      oculomotorDominance: null,
+      sensoryDominance: null,
     },
   ]
 }

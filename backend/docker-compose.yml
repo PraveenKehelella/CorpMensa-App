@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neurocognitive_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Django
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DEBUG: ${DEBUG:-false}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      # CORS / CSRF
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SQLITE_PATH: /app/data/db.sqlite3
+      # Gunicorn
+      PORT: 8000
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+    volumes:
+      # Persist sqlite database on the VPS
+      - ./data:/app/data
+    command: ["bash", "/app/entrypoint.sh"]
+

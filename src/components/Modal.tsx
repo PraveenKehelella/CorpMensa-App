@@ -5,8 +5,8 @@ interface ModalProps {
   title: string
   onClose: () => void
   children: React.ReactNode
-  /** max-w-2xl vs max-w-3xl */
-  size?: 'md' | 'lg'
+  /** md | lg | xl (full onboarding) */
+  size?: 'md' | 'lg' | 'xl'
 }
 
 export function Modal({ open, title, onClose, children, size = 'md' }: ModalProps) {
@@ -26,7 +26,12 @@ export function Modal({ open, title, onClose, children, size = 'md' }: ModalProp
     }
   }, [open])
 
-  const maxW = size === 'lg' ? 'max-w-3xl max-h-[92vh]' : 'max-w-2xl max-h-[90vh]'
+  const maxW =
+    size === 'xl'
+      ? 'max-w-6xl max-h-[94vh]'
+      : size === 'lg'
+        ? 'max-w-3xl max-h-[92vh]'
+        : 'max-w-2xl max-h-[90vh]'
 
   return (
     <div

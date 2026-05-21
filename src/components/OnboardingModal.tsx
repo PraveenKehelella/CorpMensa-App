@@ -1,24 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal } from './Modal'
 import type { Client, ClientType, Sport } from '../types'
-import { submitOnboardingVoiceTests } from '../lib/api'
-
-const LOCATIONS = [
-  'Joint',
-  'Muscles',
-  'Ligament',
-  'Dorsal',
-  'Lumbar',
-  'Cervical',
-] as const
-
-const TOTAL_STEPS = 4
-const STEP_TITLES = ['Basic info', 'Client type', 'Health assessment', 'Binocular test results']
+import { SPORTS, emptyProfile } from '../lib/clients'
+import { submitOnboardingVoiceProfile, type OnboardingVoiceProfileFields } from '../lib/api'
 
 function ageToGroup(age: number): Client['ageGroup'] {
   if (age < 20) return 'Teen'
   if (age < 60) return 'Adult'
   return 'Senior'
+}
+
+function painLevelFromNotes(notes: string): number {
+  const t = notes.trim().toLowerCase()
+  if (!t || t === 'none') return 1
+  const m = t.match(/\d+/)
+  if (m) return Math.min(10, Math.max(1, parseInt(m[0], 10)))
+  return 5
+}
+
+function cleanList(items: string[]): string[] {
+  return items.map((s) => s.trim()).filter(Boolean)
+}
+
+const SPORT_SET = new Set<string>(SPORTS)
+
+function applyVoiceProfile(prev: FormState, p: OnboardingVoiceProfileFields): FormState {
+  const nextType: ClientType = p.type === 'Athlete' ? 'Athlete' : 'Business'
+  const sport =
+    p.sport && SPORT_SET.has(p.sport) ? (p.sport as Sport) : prev.sport
+  const pain = p.pain?.trim() ? p.pain.trim() : prev.pain
+
+  return {
+    ...prev,
+    name: p.name?.trim() || prev.name,
+    age: p.age?.trim() || prev.age,
+    height: p.height?.trim() || prev.height,
+    weight: p.weight?.trim() || prev.weight,
+    visceralFat: p.visceralFat?.trim() || prev.visceralFat,
+    pain: pain || prev.pain,
+    type: p.type ? nextType : prev.type,
+    sport,
+    problems: p.problems?.length ? p.problems : prev.problems,
+    goals: p.goals?.length ? p.goals : prev.goals,
+    posture: p.posture?.length ? p.posture : prev.posture,
+    cognitiveAbilities: p.cognitiveAbilities?.length
+      ? p.cognitiveAbilities
+      : prev.cognitiveAbilities,
+    neuralDevelopment: p.neuralDevelopment?.trim() || prev.neuralDevelopment,
+    senseAbilities: p.senseAbilities?.trim() || prev.senseAbilities,
+    visualAbilities: p.visualAbilities?.trim() || prev.visualAbilities,
+    physicalAbilities: p.physicalAbilities?.length
+      ? p.physicalAbilities
+      : prev.physicalAbilities,
+  }
 }
 
 interface OnboardingModalProps {
@@ -27,36 +61,114 @@ interface OnboardingModalProps {
   onAdd: (client: Client) => void
 }
 
-const initialForm = () => ({
+type FormState = {
+  photo: string | null
+  name: string
+  age: string
+  height: string
+  weight: string
+  visceralFat: string
+  pain: string
+  type: ClientType
+  sport: Sport
+  problems: string[]
+  goals: string[]
+  posture: string[]
+  cognitiveAbilities: string[]
+  neuralDevelopment: string
+  senseAbilities: string
+  visualAbilities: string
+  physicalAbilities: string[]
+}
+
+const initialForm = (): FormState => ({
+  photo: null,
   name: '',
   age: '',
-  type: '' as ClientType | '',
-  sport: 'Soccer' as Sport,
-  painLevel: 5,
-  timeOfDay: 'Morning' as 'Morning' | 'Evening',
-  swelling: 'No' as 'Yes' | 'No',
-  locations: [] as string[],
-  internalExternal: 'Internal' as 'Internal' | 'External',
-  headaches: 'No' as 'Yes' | 'No',
-  oculomotorEye: '' as '' | 'left' | 'right',
-  oculomotorFixation: '',
-  sensoryEye: '' as '' | 'left' | 'right',
-  sensorySuppression: '' as '' | 'present' | 'absent',
-  sensoryRivalry: '' as '' | 'stable' | 'alternating',
+  height: '',
+  weight: '',
+  visceralFat: '',
+  pain: 'none',
+  type: 'Business',
+  sport: 'Soccer',
+  problems: [''],
+  goals: ['', '', ''],
+  posture: [''],
+  cognitiveAbilities: ['', ''],
+  neuralDevelopment: '',
+  senseAbilities: '',
+  visualAbilities: '',
+  physicalAbilities: ['', '', ''],
 })
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="block text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-1">
+      {children}
+    </span>
+  )
+}
+
+function ListEditor({
+  label,
+  items,
+  onChange,
+  placeholder = 'Add item…',
+}: {
+  label: string
+  items: string[]
+  onChange: (items: string[]) => void
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <ul className="space-y-2">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 w-4 shrink-0">{i + 1}.</span>
+            <input
+              value={item}
+              onChange={(e) => {
+                const next = [...items]
+                next[i] = e.target.value
+                onChange(next)
+              }}
+              placeholder={placeholder}
+              className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-medical-600/20"
+            />
+            {items.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+                className="text-slate-400 hover:text-red-600 text-lg leading-none px-1"
+                aria-label="Remove"
+              >
+                ×
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => onChange([...items, ''])}
+        className="mt-1 text-xs font-medium text-medical-700 hover:text-medical-800"
+      >
+        + Add line
+      </button>
+    </div>
+  )
+}
 
 function VoiceListeningAnimation({ active }: { active: boolean }) {
   if (!active) return null
   return (
-    <div className="flex flex-col items-center gap-3 py-4" aria-live="polite">
-      <div className="relative flex h-16 w-16 items-center justify-center">
+    <div className="flex flex-col items-center gap-2 py-3" aria-live="polite">
+      <div className="relative flex h-14 w-14 items-center justify-center">
         <div className="voice-listen-ring absolute inset-0 rounded-full bg-medical-600/25" />
-        <div
-          className="voice-listen-ring absolute inset-1 rounded-full bg-medical-600/35"
-          style={{ animationDelay: '0.15s' }}
-        />
-        <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-medical-600 text-white shadow-md">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <div className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-medical-600 text-white">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -66,31 +178,29 @@ function VoiceListeningAnimation({ active }: { active: boolean }) {
           </svg>
         </div>
       </div>
-      <div className="flex h-8 items-end justify-center gap-1">
+      <div className="flex h-6 items-end justify-center gap-1">
         {[0, 1, 2, 3, 4].map((i) => (
           <span
             key={i}
-            className="voice-listen-bar w-1.5 rounded-full bg-medical-600"
-            style={{
-              height: '60%',
-              animationDelay: `${i * 0.08}s`,
-            }}
+            className="voice-listen-bar w-1 rounded-full bg-medical-600"
+            style={{ height: '50%', animationDelay: `${i * 0.08}s` }}
           />
         ))}
       </div>
-      <p className="text-xs font-medium text-medical-700">Listening… speak your test results</p>
+      <p className="text-xs font-medium text-medical-700">AI is listening…</p>
     </div>
   )
 }
 
 export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) {
-  const [step, setStep] = useState(1)
   const [form, setForm] = useState(initialForm)
-  const [stepError, setStepError] = useState('')
+  const [formError, setFormError] = useState('')
   const [recording, setRecording] = useState(false)
   const [voiceProcessing, setVoiceProcessing] = useState(false)
   const [voiceError, setVoiceError] = useState('')
   const [lastTranscript, setLastTranscript] = useState('')
+  const [voiceFilledHint, setVoiceFilledHint] = useState('')
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -102,76 +212,21 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
       streamRef.current = null
       return
     }
-    setStep(1)
     setForm(initialForm())
-    setStepError('')
+    setFormError('')
     setRecording(false)
     setVoiceProcessing(false)
     setVoiceError('')
     setLastTranscript('')
+    setVoiceFilledHint('')
   }, [open])
 
-  function validateStep(s: number): boolean {
-    setStepError('')
-    const f = form
-    if (s === 1) {
-      if (!f.name.trim()) {
-        setStepError('Please enter a name.')
-        return false
-      }
-      const age = Number(f.age)
-      if (!f.age || age < 1 || age > 120) {
-        setStepError('Please enter a valid age (1–120).')
-        return false
-      }
-    }
-    if (s === 2) {
-      if (!f.type) {
-        setStepError('Please select a client type.')
-        return false
-      }
-      if (f.type === 'Athlete' && !f.sport) {
-        setStepError('Please select a sport.')
-        return false
-      }
-    }
-    if (s === 3) {
-      if (!f.timeOfDay) {
-        setStepError('Please select time of day.')
-        return false
-      }
-      if (!f.swelling) {
-        setStepError('Please indicate swelling.')
-        return false
-      }
-      if (!f.headaches) {
-        setStepError('Please indicate headaches.')
-        return false
-      }
-    }
-    if (s === 4) {
-      if (!f.oculomotorEye) {
-        setStepError('Select dominant eye (oculomotor) or use voice input.')
-        return false
-      }
-      if (!f.oculomotorFixation.trim()) {
-        setStepError('Enter fixation stability (oculomotor) or use voice input.')
-        return false
-      }
-      if (!f.sensoryEye) {
-        setStepError('Select dominant eye (sensory) or use voice input.')
-        return false
-      }
-      if (!f.sensorySuppression) {
-        setStepError('Select suppression (sensory) or use voice input.')
-        return false
-      }
-      if (!f.sensoryRivalry) {
-        setStepError('Select rivalry response (sensory) or use voice input.')
-        return false
-      }
-    }
-    return true
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setForm((f) => ({ ...f, photo: String(reader.result || '') }))
+    reader.readAsDataURL(file)
   }
 
   async function handleToggleVoice() {
@@ -182,6 +237,7 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
     }
     setVoiceError('')
     setLastTranscript('')
+    setVoiceFilledHint('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
@@ -192,33 +248,38 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
           : ''
       const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
       chunksRef.current = []
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+      mr.ondataavailable = (ev) => {
+        if (ev.data.size > 0) chunksRef.current.push(ev.data)
       }
       mr.onstop = async () => {
         streamRef.current?.getTracks().forEach((t) => t.stop())
         streamRef.current = null
         setRecording(false)
-        const blobType = mr.mimeType || 'audio/webm'
-        const blob = new Blob(chunksRef.current, { type: blobType })
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
         if (blob.size < 200) {
-          setVoiceError('Recording too short. Try again.')
+          setVoiceError('Recording too short.')
           return
         }
         setVoiceProcessing(true)
         try {
-          const data = await submitOnboardingVoiceTests(blob)
+          const data = await submitOnboardingVoiceProfile(blob)
           setLastTranscript(data.transcript)
-          setForm((prev) => ({
-            ...prev,
-            oculomotorEye: data.oculomotor.dominantEye,
-            oculomotorFixation: data.oculomotor.fixationStability,
-            sensoryEye: data.sensory.dominantEye,
-            sensorySuppression: data.sensory.suppression,
-            sensoryRivalry: data.sensory.rivalryResponse,
-          }))
-        } catch (e) {
-          setVoiceError(e instanceof Error ? e.message : 'Transcription failed')
+          setForm((prev) => applyVoiceProfile(prev, data.profile))
+          const filled = [
+            data.profile.name && 'name',
+            data.profile.age && 'age',
+            data.profile.height && 'height',
+            data.profile.weight && 'weight',
+            data.profile.goals?.length && 'goals',
+            data.profile.problems?.length && 'problems',
+          ].filter(Boolean)
+          setVoiceFilledHint(
+            filled.length
+              ? `Filled: ${filled.join(', ')}. Review and edit below, then save.`
+              : 'Could not extract clear fields — try speaking more slowly or edit manually.',
+          )
+        } catch (err) {
+          setVoiceError(err instanceof Error ? err.message : 'Voice fill failed')
         } finally {
           setVoiceProcessing(false)
         }
@@ -231,525 +292,362 @@ export function OnboardingModal({ open, onClose, onAdd }: OnboardingModalProps) 
     }
   }
 
-  function handleNext() {
-    if (!validateStep(step)) return
-    setStep((s) => Math.min(TOTAL_STEPS, s + 1))
-  }
-
-  function handleBack() {
-    setStepError('')
-    setStep((s) => Math.max(1, s - 1))
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!validateStep(step)) return
-    const ocuEye = form.oculomotorEye as 'left' | 'right'
-    const senEye = form.sensoryEye as 'left' | 'right'
-    const senSup = form.sensorySuppression as 'present' | 'absent'
-    const senRiv = form.sensoryRivalry as 'stable' | 'alternating'
+    setFormError('')
+    if (!form.name.trim()) {
+      setFormError('Name is required.')
+      return
+    }
+    const ageNum = Number(form.age)
+    if (!form.age || ageNum < 1 || ageNum > 120) {
+      setFormError('Enter a valid age (1–120).')
+      return
+    }
+
     const now = new Date().toISOString()
-    const pain = form.painLevel
-    const ageNumber = Number(form.age)
-    const defaultSteps = 0
-    const defaultSleep = 0
+    const painLevel = painLevelFromNotes(form.pain)
+    const profile = {
+      ...emptyProfile(),
+      photo: form.photo,
+      height: form.height.trim(),
+      weight: form.weight.trim(),
+      visceralFat: form.visceralFat.trim(),
+      painNotes: form.pain.trim() || 'none',
+      problems: cleanList(form.problems),
+      goals: cleanList(form.goals),
+      posture: cleanList(form.posture),
+      cognitiveAbilities: cleanList(form.cognitiveAbilities),
+      neuralDevelopment: form.neuralDevelopment.trim(),
+      senseAbilities: form.senseAbilities.trim(),
+      visualAbilities: form.visualAbilities.trim(),
+      physicalAbilities: cleanList(form.physicalAbilities),
+    }
+
     const defaultHr = 72
     const newClient: Client = {
       id: 'c' + Date.now(),
       name: form.name.trim(),
-      age: ageNumber,
-      type: form.type as ClientType,
-      ageGroup: ageToGroup(ageNumber),
+      age: ageNum,
+      type: form.type,
+      ageGroup: ageToGroup(ageNum),
       sport: form.type === 'Athlete' ? form.sport : null,
-      painLevel: pain,
-      timeOfDay: form.timeOfDay as string,
-      swelling: form.swelling as string,
-      location: form.locations.length ? form.locations : ['—'],
-      internalExternal: form.internalExternal,
-      headaches: form.headaches as string,
-      steps: defaultSteps,
-      sleep: defaultSleep,
+      profile,
+      painLevel,
+      timeOfDay: 'Morning',
+      swelling: 'No',
+      location: ['—'],
+      internalExternal: 'Internal',
+      headaches: 'No',
+      steps: 0,
+      sleep: 0,
       heartRate: defaultHr,
       bloodPressureSystolic: null,
       bloodPressureDiastolic: null,
       vitalsOverview: '',
       lastUpdated: now,
-      notes: '',
+      notes: [
+        profile.neuralDevelopment && `Neural: ${profile.neuralDevelopment}`,
+        profile.senseAbilities && `Sense: ${profile.senseAbilities}`,
+        profile.visualAbilities && `Visual: ${profile.visualAbilities}`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       active: true,
-      painHistory: [{ date: now, value: pain }],
+      painHistory: [{ date: now, value: painLevel }],
       vitalSignsHistory: [
-        {
-          date: now,
-          heartRate: defaultHr,
-          systolic: null,
-          diastolic: null,
-        },
+        { date: now, heartRate: defaultHr, systolic: null, diastolic: null },
       ],
       cognitiveMetrics: null,
       cognitiveHistory: [],
-      oculomotorDominance: {
-        dominantEye: ocuEye,
-        fixationStability: form.oculomotorFixation.trim(),
-      },
-      sensoryDominance: {
-        dominantEye: senEye,
-        suppression: senSup,
-        rivalryResponse: senRiv,
-      },
+      oculomotorDominance: null,
+      sensoryDominance: null,
     }
     onAdd(newClient)
   }
 
-  function toggleLocation(loc: string) {
-    setForm((f) => ({
-      ...f,
-      locations: f.locations.includes(loc)
-        ? f.locations.filter((x) => x !== loc)
-        : [...f.locations, loc],
-    }))
-  }
-
-  const progress = (step / TOTAL_STEPS) * 100
   const listeningUi = recording || voiceProcessing
 
   return (
-    <Modal open={open} title="Client onboarding" onClose={onClose} size={step === 4 ? 'lg' : 'md'}>
-      <form onSubmit={handleSubmit} className="p-6 space-y-6">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-medical-700">
-              Step {step} of {TOTAL_STEPS}
+    <Modal open={open} title="New client profile" onClose={onClose} size="xl">
+      <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <div className="rounded-xl border-2 border-medical-200 bg-gradient-to-br from-medical-50 to-white p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-slate-900">Voice intake</h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Tap the microphone and describe the client in one pass — name, age, height, weight,
+                pain, goals, problems, posture, cognitive and physical abilities. OpenAI will
+                transcribe your speech and fill every matching field below. You can still edit
+                manually afterward.
+              </p>
+              {!recording && !voiceProcessing ? (
+                <p className="mt-2 text-xs text-slate-500 italic">
+                  Example: &quot;Patient Javier, 34 years old, five foot seven, 67 kilos, visceral
+                  fat 9 kg, no pain, business client, tight core, goals are feel more active,
+                  reduce stress, play with children, posture range of motion, memory and
+                  planning, good listening, max heart rate and VO2 max.&quot;
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col items-center gap-2 shrink-0">
+              <VoiceListeningAnimation active={recording} />
+              {voiceProcessing ? (
+                <div className="flex items-center gap-2 py-2">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-medical-600 border-t-transparent" />
+                  <span className="text-xs font-medium text-slate-700">Processing…</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  disabled={voiceProcessing}
+                  className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold shadow-md transition-all ${
+                    recording
+                      ? 'bg-red-600 text-white hover:bg-red-700 ring-2 ring-red-300'
+                      : 'bg-medical-600 text-white hover:bg-medical-700 ring-2 ring-medical-200'
+                  } disabled:opacity-50`}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                  {recording ? 'Stop recording' : 'Describe client by voice'}
+                </button>
+              )}
+            </div>
+          </div>
+          {voiceError ? (
+            <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {voiceError}
             </p>
-            <p className="text-xs text-slate-500">{STEP_TITLES[step - 1]}</p>
-          </div>
-          <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full bg-medical-600 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          ) : null}
+          {voiceFilledHint && !voiceProcessing ? (
+            <p className="mt-3 text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+              {voiceFilledHint}
+            </p>
+          ) : null}
+          {lastTranscript && !voiceProcessing ? (
+            <details className="mt-3">
+              <summary className="text-xs font-medium text-slate-600 cursor-pointer">
+                View transcript
+              </summary>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">{lastTranscript}</p>
+            </details>
+          ) : null}
         </div>
 
-        {stepError && (
+        {formError ? (
           <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {stepError}
+            {formError}
           </p>
-        )}
+        ) : null}
 
-        {step === 1 && (
-          <fieldset className="space-y-4 border-0 p-0 m-0">
-            <legend className="text-sm font-semibold text-medical-700">Basic info</legend>
-            <div className="grid sm:grid-cols-2 gap-4">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Photo column */}
+          <div className="lg:w-56 shrink-0 flex flex-col items-center">
+            <div className="w-full aspect-[3/4] max-w-[220px] rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 overflow-hidden flex items-center justify-center">
+              {form.photo ? (
+                <img src={form.photo} alt="Client" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs text-slate-400 px-4 text-center">Upload photo</span>
+              )}
+            </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="mt-3 w-full max-w-[220px] px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-white"
+            >
+              {form.photo ? 'Change photo' : 'Upload photo'}
+            </button>
+            {form.photo ? (
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, photo: null }))}
+                className="mt-1 text-xs text-red-600 hover:underline"
+              >
+                Remove photo
+              </button>
+            ) : null}
+          </div>
+
+          {/* Data columns */}
+          <div className="flex-1 grid md:grid-cols-2 gap-6 text-sm">
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="obName">
-                  Name
-                </label>
+                <FieldLabel>name</FieldLabel>
                 <input
-                  id="obName"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="obAge">
-                  Age
-                </label>
+                <FieldLabel>age</FieldLabel>
                 <input
-                  id="obAge"
                   type="number"
                   min={1}
                   max={120}
                   value={form.age}
                   onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
                 />
               </div>
-            </div>
-            <p className="text-xs text-slate-500">
-              Age group is assigned automatically from age (Teen / Adult / Senior).
-            </p>
-          </fieldset>
-        )}
-
-        {step === 2 && (
-          <fieldset className="space-y-4 border-0 p-0 m-0">
-            <legend className="text-sm font-semibold text-medical-700">Client type</legend>
-            <div className="flex flex-wrap gap-4">
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="type"
-                  checked={form.type === 'Business'}
-                  onChange={() => setForm((f) => ({ ...f, type: 'Business' }))}
-                  className="text-medical-600"
-                />
-                Business client
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="type"
-                  checked={form.type === 'Athlete'}
-                  onChange={() => setForm((f) => ({ ...f, type: 'Athlete' }))}
-                  className="text-medical-600"
-                />
-                Athlete
-              </label>
-            </div>
-            {form.type === 'Athlete' && (
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="obSport">
-                  Sport type
-                </label>
-                <select
-                  id="obSport"
-                  value={form.sport}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, sport: e.target.value as Sport }))
-                  }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
-                >
-                  <option value="Soccer">Soccer</option>
-                  <option value="Cycle">Bike rider — Cycle</option>
-                  <option value="Motorbike">Bike rider — Motorbike</option>
-                  <option value="Boxing">Boxing</option>
-                  <option value="Tennis">Tennis</option>
-                </select>
+                <FieldLabel>height</FieldLabel>
+                <input
+                  value={form.height}
+                  onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))}
+                  placeholder={"e.g. 5' 7\""}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
               </div>
-            )}
-          </fieldset>
-        )}
-
-        {step === 3 && (
-          <fieldset className="space-y-4 border-0 p-0 m-0">
-            <legend className="text-sm font-semibold text-medical-700">Health assessment</legend>
-            <div>
-              <label className="flex justify-between text-xs font-medium text-slate-600 mb-1">
-                <span>Pain level</span>
-                <span className="text-medical-700">{form.painLevel}</span>
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                value={form.painLevel}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, painLevel: Number(e.target.value) }))
-                }
-                className="w-full accent-medical-600"
+              <div>
+                <FieldLabel>weight</FieldLabel>
+                <input
+                  value={form.weight}
+                  onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))}
+                  placeholder="e.g. 67 kg"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
+              </div>
+              <div>
+                <FieldLabel>visceral fat</FieldLabel>
+                <input
+                  value={form.visceralFat}
+                  onChange={(e) => setForm((f) => ({ ...f, visceralFat: e.target.value }))}
+                  placeholder="e.g. 9 kg"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
+              </div>
+              <div>
+                <FieldLabel>pain</FieldLabel>
+                <input
+                  value={form.pain}
+                  onChange={(e) => setForm((f) => ({ ...f, pain: e.target.value }))}
+                  placeholder="none or description"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
+              </div>
+              <div>
+                <FieldLabel>type</FieldLabel>
+                <div className="flex gap-4 mt-1">
+                  {(['Business', 'Athlete'] as const).map((t) => (
+                    <label key={t} className="inline-flex items-center gap-2 capitalize">
+                      <input
+                        type="radio"
+                        name="clientType"
+                        checked={form.type === t}
+                        onChange={() => setForm((f) => ({ ...f, type: t }))}
+                        className="text-medical-600"
+                      />
+                      {t.toLowerCase()}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {form.type === 'Athlete' ? (
+                <div>
+                  <FieldLabel>sport</FieldLabel>
+                  <select
+                    value={form.sport}
+                    onChange={(e) => setForm((f) => ({ ...f, sport: e.target.value as Sport }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                  >
+                    <option value="Soccer">Soccer</option>
+                    <option value="Cycle">Cycle</option>
+                    <option value="Motorbike">Motorbike</option>
+                    <option value="Boxing">Boxing</option>
+                    <option value="Tennis">Tennis</option>
+                  </select>
+                </div>
+              ) : null}
+              <ListEditor
+                label="problem"
+                items={form.problems}
+                onChange={(problems) => setForm((f) => ({ ...f, problems }))}
+                placeholder="e.g. Tight core"
               />
             </div>
-            <div>
-              <span className="block text-xs font-medium text-slate-600 mb-2">Time of day</span>
-              <div className="flex gap-4">
-                {(['Morning', 'Evening'] as const).map((t) => (
-                  <label key={t} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="timeOfDay"
-                      checked={form.timeOfDay === t}
-                      onChange={() => setForm((f) => ({ ...f, timeOfDay: t }))}
-                      className="text-medical-600"
-                    />
-                    {t}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-slate-600 mb-2">Swelling</span>
-              <div className="flex gap-4">
-                {(['Yes', 'No'] as const).map((v) => (
-                  <label key={v} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="swelling"
-                      checked={form.swelling === v}
-                      onChange={() => setForm((f) => ({ ...f, swelling: v }))}
-                      className="text-medical-600"
-                    />
-                    {v}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-slate-600 mb-2">Pain location</span>
-              <div className="grid sm:grid-cols-2 gap-2 text-sm">
-                {LOCATIONS.map((loc) => (
-                  <label key={loc} className="inline-flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={form.locations.includes(loc)}
-                      onChange={() => toggleLocation(loc)}
-                      className="rounded text-medical-600"
-                    />
-                    {loc}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="obIntExt">
-                Internal vs external
-              </label>
-              <select
-                id="obIntExt"
-                value={form.internalExternal}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    internalExternal: e.target.value as 'Internal' | 'External',
-                  }))
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
-              >
-                <option value="Internal">Internal</option>
-                <option value="External">External</option>
-              </select>
-            </div>
-            <div>
-              <span className="block text-xs font-medium text-slate-600 mb-2">Headaches</span>
-              <div className="flex gap-4">
-                {(['Yes', 'No'] as const).map((v) => (
-                  <label key={v} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="headaches"
-                      checked={form.headaches === v}
-                      onChange={() => setForm((f) => ({ ...f, headaches: v }))}
-                      className="text-medical-600"
-                    />
-                    {v}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </fieldset>
-        )}
 
-        {step === 4 && (
-          <div className="space-y-6">
-            <p className="text-sm text-slate-600">
-              Record a short voice summary of both tests, or enter results manually below.
-            </p>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-              {voiceProcessing ? (
-                <div className="flex flex-col items-center gap-3 py-6">
-                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-medical-600 border-t-transparent" />
-                  <p className="text-sm font-medium text-slate-700">Transcribing and filling fields…</p>
-                </div>
-              ) : (
-                <>
-                  <VoiceListeningAnimation active={recording} />
-                  <div className="flex flex-wrap items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleToggleVoice}
-                      disabled={voiceProcessing}
-                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        recording
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-medical-600 text-white hover:bg-medical-700'
-                      } disabled:opacity-50`}
-                    >
-                      {recording ? (
-                        <>
-                          <span className="relative flex h-2 w-2">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
-                          </span>
-                          Stop & process
-                        </>
-                      ) : (
-                        <>
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                            />
-                          </svg>
-                          Start voice input
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
-              )}
-              {voiceError ? (
-                <p className="mt-3 text-center text-xs text-red-600">{voiceError}</p>
-              ) : null}
-              {lastTranscript && !voiceProcessing ? (
-                <p className="mt-3 text-xs text-slate-500">
-                  <span className="font-semibold text-slate-600">Transcript:</span> {lastTranscript}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4 m-0">
-                <legend className="text-sm font-semibold text-medical-800 px-1">
-                  Oculomotor dominance
-                </legend>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Determines the dominant eye for motor alignment (alternate cover test or pointing test).
-                  Record which eye maintains fixation more consistently.
-                </p>
-                <div>
-                  <span className="block text-xs font-medium text-slate-600 mb-2">Dominant eye</span>
-                  <div className="flex gap-4">
-                    {(['left', 'right'] as const).map((eye) => (
-                      <label key={eye} className="inline-flex items-center gap-2 text-sm capitalize">
-                        <input
-                          type="radio"
-                          name="oculomotorEye"
-                          checked={form.oculomotorEye === eye}
-                          onChange={() => setForm((f) => ({ ...f, oculomotorEye: eye }))}
-                          className="text-medical-600"
-                        />
-                        {eye}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="obOcuFix">
-                    Fixation stability (qualitative)
-                  </label>
-                  <input
-                    id="obOcuFix"
-                    value={form.oculomotorFixation}
-                    onChange={(e) => setForm((f) => ({ ...f, oculomotorFixation: e.target.value }))}
-                    placeholder="e.g. Stable, mild drift…"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-medical-600/20 focus:border-medical-600 outline-none"
-                  />
-                </div>
-              </fieldset>
-
-              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4 m-0">
-                <legend className="text-sm font-semibold text-medical-800 px-1">Sensory dominance</legend>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Sensory dominance (binocular rivalry, +1.50D blur, or Worth 4 Dot). Note suppression and
-                  whether rivalry is stable or alternating.
-                </p>
-                <div>
-                  <span className="block text-xs font-medium text-slate-600 mb-2">Dominant eye</span>
-                  <div className="flex gap-4">
-                    {(['left', 'right'] as const).map((eye) => (
-                      <label key={eye} className="inline-flex items-center gap-2 text-sm capitalize">
-                        <input
-                          type="radio"
-                          name="sensoryEye"
-                          checked={form.sensoryEye === eye}
-                          onChange={() => setForm((f) => ({ ...f, sensoryEye: eye }))}
-                          className="text-medical-600"
-                        />
-                        {eye}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <span className="block text-xs font-medium text-slate-600 mb-2">Suppression</span>
-                  <div className="flex gap-4">
-                    {(['present', 'absent'] as const).map((v) => (
-                      <label key={v} className="inline-flex items-center gap-2 text-sm capitalize">
-                        <input
-                          type="radio"
-                          name="sensorySuppression"
-                          checked={form.sensorySuppression === v}
-                          onChange={() => setForm((f) => ({ ...f, sensorySuppression: v }))}
-                          className="text-medical-600"
-                        />
-                        {v}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <span className="block text-xs font-medium text-slate-600 mb-2">Rivalry response</span>
-                  <div className="flex gap-4">
-                    {(['stable', 'alternating'] as const).map((v) => (
-                      <label key={v} className="inline-flex items-center gap-2 text-sm capitalize">
-                        <input
-                          type="radio"
-                          name="sensoryRivalry"
-                          checked={form.sensoryRivalry === v}
-                          onChange={() => setForm((f) => ({ ...f, sensoryRivalry: v }))}
-                          className="text-medical-600"
-                        />
-                        {v}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </fieldset>
+            <div className="space-y-4">
+              <ListEditor
+                label="Goals"
+                items={form.goals}
+                onChange={(goals) => setForm((f) => ({ ...f, goals }))}
+              />
+              <ListEditor
+                label="posture"
+                items={form.posture}
+                onChange={(posture) => setForm((f) => ({ ...f, posture }))}
+              />
+              <ListEditor
+                label="Cognitive abilities"
+                items={form.cognitiveAbilities}
+                onChange={(cognitiveAbilities) => setForm((f) => ({ ...f, cognitiveAbilities }))}
+              />
+              <div>
+                <FieldLabel>Neural development</FieldLabel>
+                <textarea
+                  rows={2}
+                  value={form.neuralDevelopment}
+                  onChange={(e) => setForm((f) => ({ ...f, neuralDevelopment: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20 resize-y"
+                />
+              </div>
+              <div>
+                <FieldLabel>Sense abilities</FieldLabel>
+                <input
+                  value={form.senseAbilities}
+                  onChange={(e) => setForm((f) => ({ ...f, senseAbilities: e.target.value }))}
+                  placeholder="e.g. listening"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
+              </div>
+              <div>
+                <FieldLabel>Visual abilities</FieldLabel>
+                <input
+                  value={form.visualAbilities}
+                  onChange={(e) => setForm((f) => ({ ...f, visualAbilities: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:ring-2 focus:ring-medical-600/20"
+                />
+              </div>
+              <ListEditor
+                label="Physical abilities"
+                items={form.physicalAbilities}
+                onChange={(physicalAbilities) => setForm((f) => ({ ...f, physicalAbilities }))}
+                placeholder="e.g. max heart rate"
+              />
             </div>
           </div>
-        )}
+        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-          <div className="flex gap-3">
-            {step > 1 && (
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={listeningUi}
-                className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Back
-              </button>
-            )}
-            {step < TOTAL_STEPS && (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={listeningUi}
-                className="px-5 py-2.5 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700 shadow-sm transition-colors disabled:opacity-50"
-              >
-                Next
-              </button>
-            )}
-            {step === 3 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStepError('')
-                  setStep(4)
-                }}
-                disabled={listeningUi}
-                className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Skip
-              </button>
-            )}
-            {step === TOTAL_STEPS && (
-              <button
-                type="submit"
-                disabled={listeningUi}
-                className="px-5 py-2.5 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700 shadow-sm transition-colors disabled:opacity-50"
-              >
-                Submit
-              </button>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <button
             type="button"
+            onClick={onClose}
             disabled={listeningUi}
-            onClick={() => {
-              setForm(initialForm())
-              setStep(1)
-              setStepError('')
-              setVoiceError('')
-              setLastTranscript('')
-            }}
-            className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
           >
-            Reset
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={listeningUi}
+            className="px-6 py-2.5 rounded-lg bg-medical-600 text-white text-sm font-medium hover:bg-medical-700 shadow-sm disabled:opacity-50"
+          >
+            Save client
           </button>
         </div>
       </form>

@@ -4,6 +4,7 @@ const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) || 'http://127.0.0.1:8000/api'
 const VITALS_API = `${API_BASE}/vitals/extract/`
 const ONBOARDING_VOICE_API = `${API_BASE}/onboarding/voice-tests/`
+const ONBOARDING_VOICE_PROFILE_API = `${API_BASE}/onboarding/voice-profile/`
 
 export interface ExtractedVitalPoint {
   heartRate: number | null
@@ -23,6 +24,21 @@ export async function fetchClients(): Promise<Client[]> {
   const list = (await res.json()) as Client[]
   return list.map((c) => ({
     ...c,
+    profile: c.profile ?? {
+      photo: null,
+      height: '',
+      weight: '',
+      visceralFat: '',
+      painNotes: '',
+      problems: [],
+      goals: [],
+      posture: [],
+      cognitiveAbilities: [],
+      neuralDevelopment: '',
+      senseAbilities: '',
+      visualAbilities: '',
+      physicalAbilities: [],
+    },
     oculomotorDominance: c.oculomotorDominance ?? null,
     sensoryDominance: c.sensoryDominance ?? null,
   }))
@@ -59,6 +75,45 @@ export interface OnboardingVoiceTestsResponse {
   transcript: string
   oculomotor: OculomotorDominanceResult
   sensory: SensoryDominanceResult
+}
+
+export interface OnboardingVoiceProfileFields {
+  name: string
+  age: string
+  height: string
+  weight: string
+  visceralFat: string
+  pain: string
+  type: 'Business' | 'Athlete'
+  sport: string
+  problems: string[]
+  goals: string[]
+  posture: string[]
+  cognitiveAbilities: string[]
+  neuralDevelopment: string
+  senseAbilities: string
+  visualAbilities: string
+  physicalAbilities: string[]
+}
+
+export async function submitOnboardingVoiceProfile(
+  audio: Blob,
+): Promise<{ transcript: string; profile: OnboardingVoiceProfileFields }> {
+  const form = new FormData()
+  const ext = audio.type.includes('webm') ? 'webm' : audio.type.includes('wav') ? 'wav' : 'webm'
+  form.append('audio', audio, `recording.${ext}`)
+
+  const res = await fetch(ONBOARDING_VOICE_PROFILE_API, {
+    method: 'POST',
+    body: form,
+  })
+
+  if (!res.ok) {
+    const message = await res.text()
+    throw new Error(message || 'Voice profile transcription failed')
+  }
+
+  return res.json()
 }
 
 export async function submitOnboardingVoiceTests(audio: Blob): Promise<OnboardingVoiceTestsResponse> {

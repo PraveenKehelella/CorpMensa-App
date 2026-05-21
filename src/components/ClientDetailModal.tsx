@@ -225,9 +225,41 @@ export function ClientDetailModal({
     onDeleteClient(c.id)
   }
 
+  const p = c.profile
+
   return (
     <Modal open={open} title={c.name} onClose={onClose} size="lg">
       <div className="p-6 space-y-6">
+        {p ? (
+          <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+            {p.photo ? (
+              <img
+                src={p.photo}
+                alt={c.name}
+                className="w-28 h-36 object-cover rounded-lg border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-28 h-36 rounded-lg border border-dashed border-slate-300 bg-white shrink-0 flex items-center justify-center text-xs text-slate-400">
+                No photo
+              </div>
+            )}
+            <div className="flex-1 grid sm:grid-cols-2 gap-2 text-sm min-w-0">
+              <ProfileRow label="Height" value={p.height || '—'} />
+              <ProfileRow label="Weight" value={p.weight || '—'} />
+              <ProfileRow label="Visceral fat" value={p.visceralFat || '—'} />
+              <ProfileRow label="Pain (notes)" value={p.painNotes || '—'} />
+              {p.goals.length ? (
+                <ProfileRow label="Goals" value={p.goals.join(' · ')} />
+              ) : null}
+              {p.problems.length ? (
+                <ProfileRow label="Problems" value={p.problems.join(' · ')} />
+              ) : null}
+              {p.physicalAbilities.length ? (
+                <ProfileRow label="Physical" value={p.physicalAbilities.join(' · ')} />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
           <ProfileRow label="Age" value={String(c.age)} />
           <ProfileRow label="Type" value={c.type} />

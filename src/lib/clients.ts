@@ -1,4 +1,22 @@
-import type { Client, PainHistoryPoint } from '../types'
+import type { Client, ClientProfile, PainHistoryPoint } from '../types'
+
+export function emptyProfile(): ClientProfile {
+  return {
+    photo: null,
+    height: '',
+    weight: '',
+    visceralFat: '',
+    painNotes: '',
+    problems: [],
+    goals: [],
+    posture: [],
+    cognitiveAbilities: [],
+    neuralDevelopment: '',
+    senseAbilities: '',
+    visualAbilities: '',
+    physicalAbilities: [],
+  }
+}
 
 export const SPORTS = ['Soccer', 'Cycle', 'Motorbike', 'Boxing', 'Tennis'] as const
 
@@ -29,6 +47,19 @@ export function createInitialClients(): Client[] {
       type: 'Business',
       ageGroup: 'Adult',
       sport: null,
+      profile: {
+        ...emptyProfile(),
+        height: "5' 7\"",
+        weight: '67 kg',
+        visceralFat: '9 kg',
+        painNotes: 'none',
+        problems: ['Tight core'],
+        goals: ['feel more active', 'reduce stress', 'play with children'],
+        posture: ['Range of motion'],
+        cognitiveAbilities: ['memory', 'planification'],
+        senseAbilities: 'listening',
+        physicalAbilities: ['max heart rate', 'VO2 max'],
+      },
       painLevel: 3,
       timeOfDay: 'Morning',
       swelling: 'No',
@@ -64,6 +95,7 @@ export function createInitialClients(): Client[] {
       type: 'Business',
       ageGroup: 'Senior',
       sport: null,
+      profile: emptyProfile(),
       painLevel: 6,
       timeOfDay: 'Evening',
       swelling: 'Yes',
@@ -95,6 +127,7 @@ export function createInitialClients(): Client[] {
       type: 'Athlete',
       ageGroup: 'Teen',
       sport: 'Soccer',
+      profile: emptyProfile(),
       painLevel: 8,
       timeOfDay: 'Evening',
       swelling: 'Yes',
@@ -126,6 +159,7 @@ export function createInitialClients(): Client[] {
       type: 'Athlete',
       ageGroup: 'Adult',
       sport: 'Boxing',
+      profile: emptyProfile(),
       painLevel: 5,
       timeOfDay: 'Morning',
       swelling: 'No',
@@ -157,6 +191,7 @@ export function createInitialClients(): Client[] {
       type: 'Athlete',
       ageGroup: 'Adult',
       sport: 'Tennis',
+      profile: emptyProfile(),
       painLevel: 2,
       timeOfDay: 'Morning',
       swelling: 'No',

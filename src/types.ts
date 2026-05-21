@@ -57,6 +57,23 @@ export interface SensoryDominanceResult {
   rivalryResponse: 'stable' | 'alternating'
 }
 
+/** Extended onboarding / profile fields */
+export interface ClientProfile {
+  photo: string | null
+  height: string
+  weight: string
+  visceralFat: string
+  painNotes: string
+  problems: string[]
+  goals: string[]
+  posture: string[]
+  cognitiveAbilities: string[]
+  neuralDevelopment: string
+  senseAbilities: string
+  visualAbilities: string
+  physicalAbilities: string[]
+}
+
 export interface Client {
   id: string
   name: string
@@ -64,6 +81,7 @@ export interface Client {
   type: ClientType
   ageGroup: AgeGroup
   sport: Sport | null
+  profile: ClientProfile
   painLevel: number
   timeOfDay: string
   swelling: string
